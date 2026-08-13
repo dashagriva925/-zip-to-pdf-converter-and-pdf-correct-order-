@@ -1,48 +1,16 @@
 here/* =========================================================
    ZIP → PDF CONVERTER
-   FEES1DD VERSION
-
-   Required order:
-
-   1.  fees1ps.pdf
-   2.  fees1cc.jpg
-   3.  fees101.pdf
-   4.  fees102.pdf
-   5.  fees103.pdf
-   6.  fees104.pdf
-   7.  fees105.pdf
-   8.  fees106.pdf
-   9.  fees107.pdf
-   10. fees108.pdf
-   11. fees109.pdf
-   12. fees110.pdf
-   13. fees111.pdf
-   14. fees112.pdf
-   15. fees113.pdf
-   16. fees114.pdf
-   17. fees1gl.pdf
-
-   IMPORTANT:
-   - PDFs are copied without rebuilding their pages.
-   - JPG/PNG images are placed onto A4 PDF pages.
-   - fees1cc.jpg has a browser-decoding fallback because some
-     JPEG files are rejected by pdf-lib even though browsers
-     can display them.
+   fees1dd textbook
    ========================================================= */
 
 (() => {
   "use strict";
-
-  /* =========================================================
-     SETTINGS
-     ========================================================= */
 
   const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
   const REQUIRED_ORDER = [
     "fees1ps.pdf",
     "fees1cc.jpg",
-
     "fees101.pdf",
     "fees102.pdf",
     "fees103.pdf",
@@ -57,389 +25,221 @@ here/* =========================================================
     "fees112.pdf",
     "fees113.pdf",
     "fees114.pdf",
-
     "fees1gl.pdf"
   ];
-
-  const PDFLIB_URL =
-    "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
 
   const JSZIP_URL =
     "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
 
+  const PDFLIB_URL =
+    "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+
+  let zipInput;
+  let convertBtn;
+  let fileInfo;
+  let statusBox;
+
 
   /* =========================================================
-     GLOBALS
+     FIND ELEMENTS
      ========================================================= */
 
-  let statusBox = null;
-  let lastOutputBytes = null;
+  function getElements() {
+    zipInput = document.getElementById("zipInput");
+    convertBtn = document.getElementById("convertBtn");
+    fileInfo = document.getElementById("fileInfo");
+    statusBox = document.getElementById("conversionStatus");
 
-
-  /* =========================================================
-     FIND FILE INPUT
-     ========================================================= */
-
-  function findFileInput() {
-    const ids = [
-      "zipInput",
-      "zipFile",
-      "fileInput",
-      "file",
-      "uploadFile",
-      "zip"
-    ];
-
-    for (const id of ids) {
-      const element = document.getElementById(id);
-
-      if (
-        element &&
-        element.tagName === "INPUT" &&
-        element.type === "file"
-      ) {
-        return element;
-      }
-    }
-
-    return document.querySelector(
-      'input[type="file"]'
-    );
+    console.log("ZIP converter elements:", {
+      zipInput,
+      convertBtn,
+      fileInfo,
+      statusBox
+    });
   }
 
 
   /* =========================================================
-     FIND CONVERT BUTTON
+     STATUS
      ========================================================= */
 
-  function findConvertButton() {
-    const ids = [
-      "convertBtn",
-      "convertButton",
-      "convert",
-      "convertZip",
-      "convertZipBtn"
-    ];
+  function showStatus(message, type = "info") {
+    if (!statusBox) return;
 
-    for (const id of ids) {
-      const element =
-        document.getElementById(id);
+    statusBox.style.display = "block";
+    statusBox.textContent = message;
 
-      if (element) {
-        return element;
-      }
-    }
-
-    const buttons =
-      document.querySelectorAll("button");
-
-    for (const button of buttons) {
-      const text =
-        (button.textContent || "")
-          .trim()
-          .toLowerCase();
-
-      if (
-        text.includes("convert") &&
-        text.includes("zip")
-      ) {
-        return button;
-      }
-    }
-
-    for (const button of buttons) {
-      const text =
-        (button.textContent || "")
-          .trim()
-          .toLowerCase();
-
-      if (text.includes("convert")) {
-        return button;
-      }
-    }
-
-    return null;
-  }
-
-
-  /* =========================================================
-     FIND FILE INFO
-     ========================================================= */
-
-  function findFileInfo() {
-    return document.getElementById(
-      "fileInfo"
-    );
-  }
-
-
-  /* =========================================================
-     STATUS BOX
-     ========================================================= */
-
-  function createStatusBox() {
-    if (statusBox) {
-      return statusBox;
-    }
-
-    statusBox =
-      document.getElementById(
-        "conversionStatus"
-      );
-
-    if (!statusBox) {
-      statusBox =
-        document.createElement("div");
-
-      statusBox.id =
-        "conversionStatus";
-
-      const button =
-        findConvertButton();
-
-      if (
-        button &&
-        button.parentNode
-      ) {
-        button.parentNode.insertBefore(
-          statusBox,
-          button.nextSibling
-        );
-      } else {
-        document.body.appendChild(
-          statusBox
-        );
-      }
-    }
-
-    statusBox.style.marginTop = "18px";
-    statusBox.style.padding = "16px";
-    statusBox.style.borderRadius = "14px";
-    statusBox.style.fontFamily =
-      "Arial, sans-serif";
-    statusBox.style.fontSize = "16px";
-    statusBox.style.lineHeight = "1.5";
+    statusBox.style.padding = "15px";
+    statusBox.style.borderRadius = "12px";
     statusBox.style.whiteSpace = "pre-wrap";
-    statusBox.style.wordBreak = "break-word";
-
-    return statusBox;
-  }
-
-
-  function showStatus(
-    message,
-    type = "info"
-  ) {
-    const box =
-      createStatusBox();
-
-    box.style.display = "block";
+    statusBox.style.lineHeight = "1.5";
 
     if (type === "success") {
-      box.style.background =
-        "#e8f5e9";
-
-      box.style.border =
-        "1px solid #81c784";
-
-      box.style.color =
-        "#1b5e20";
+      statusBox.style.background = "#e8f5e9";
+      statusBox.style.border = "1px solid #81c784";
+      statusBox.style.color = "#1b5e20";
+    } else if (type === "error") {
+      statusBox.style.background = "#ffebee";
+      statusBox.style.border = "1px solid #ef9a9a";
+      statusBox.style.color = "#b71c1c";
+    } else if (type === "warning") {
+      statusBox.style.background = "#fff8e1";
+      statusBox.style.border = "1px solid #ffcc80";
+      statusBox.style.color = "#e65100";
+    } else {
+      statusBox.style.background = "#f1f5f9";
+      statusBox.style.border = "1px solid #cbd5e1";
+      statusBox.style.color = "#111827";
     }
-
-    else if (type === "error") {
-      box.style.background =
-        "#ffebee";
-
-      box.style.border =
-        "1px solid #ef9a9a";
-
-      box.style.color =
-        "#b71c1c";
-    }
-
-    else if (type === "warning") {
-      box.style.background =
-        "#fff8e1";
-
-      box.style.border =
-        "1px solid #ffcc80";
-
-      box.style.color =
-        "#e65100";
-    }
-
-    else {
-      box.style.background =
-        "#f1f5f9";
-
-      box.style.border =
-        "1px solid #cbd5e1";
-
-      box.style.color =
-        "#111827";
-    }
-
-    box.textContent =
-      message;
   }
 
 
   /* =========================================================
-     FORMAT BYTES
+     FILE SIZE
      ========================================================= */
 
   function formatBytes(bytes) {
-    if (
-      !Number.isFinite(bytes)
-    ) {
-      return "0 B";
-    }
-
     if (bytes < 1024) {
       return `${bytes} B`;
     }
 
-    if (
-      bytes <
-      1024 * 1024
-    ) {
-      return (
-        (bytes / 1024)
-          .toFixed(2) +
-        " KB"
-      );
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
     }
 
-    if (
-      bytes <
-      1024 *
-      1024 *
-      1024
-    ) {
-      return (
-        (
-          bytes /
-          (1024 * 1024)
-        ).toFixed(2) +
-        " MB"
-      );
+    if (bytes < 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     }
 
-    return (
-      (
-        bytes /
-        (1024 *
-          1024 *
-          1024)
-      ).toFixed(2) +
-      " GB"
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  }
+
+
+  /* =========================================================
+     FILE SELECTION
+     ========================================================= */
+
+  function handleFileSelection() {
+    console.log("File input changed.");
+
+    if (!zipInput) {
+      console.error("zipInput not found.");
+      return;
+    }
+
+    const files = zipInput.files;
+
+    console.log("Selected files:", files);
+
+    if (!files || files.length === 0) {
+      if (fileInfo) {
+        fileInfo.textContent = "No ZIP file selected.";
+      }
+
+      if (convertBtn) {
+        convertBtn.disabled = true;
+      }
+
+      return;
+    }
+
+    const file = files[0];
+
+    console.log("Selected ZIP:", file.name, file.size);
+
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      if (fileInfo) {
+        fileInfo.textContent =
+          "❌ Please select a .zip file.";
+      }
+
+      if (convertBtn) {
+        convertBtn.disabled = true;
+      }
+
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      if (fileInfo) {
+        fileInfo.textContent =
+          `❌ File is too large.\n\n` +
+          `Selected: ${formatBytes(file.size)}\n` +
+          `Maximum: 500 MB`;
+      }
+
+      if (convertBtn) {
+        convertBtn.disabled = true;
+      }
+
+      return;
+    }
+
+    /* IMPORTANT:
+       Update the actual HTML fileInfo element. */
+
+    if (fileInfo) {
+      fileInfo.textContent =
+        `Selected: ${file.name}\n` +
+        `Size: ${formatBytes(file.size)}\n\n` +
+        `✅ Ready to convert.`;
+    }
+
+    /* IMPORTANT:
+       Enable Convert button immediately. */
+
+    if (convertBtn) {
+      convertBtn.disabled = false;
+      convertBtn.style.display = "block";
+    }
+
+    showStatus(
+      "ZIP file selected successfully.\n\n" +
+      "Tap “Convert ZIP to PDF” to begin.",
+      "success"
     );
   }
 
 
   /* =========================================================
-     LOAD EXTERNAL SCRIPT
+     LOAD SCRIPT
      ========================================================= */
 
-  function loadScript(
-    src,
-    globalName
-  ) {
-    return new Promise(
-      (resolve, reject) => {
-        if (
-          window[globalName]
-        ) {
-          resolve(
-            window[globalName]
-          );
-          return;
-        }
+  function loadScript(src, globalName) {
+    return new Promise((resolve, reject) => {
 
-        const existing =
-          document.querySelector(
-            `script[src="${src}"]`
-          );
+      if (window[globalName]) {
+        resolve(window[globalName]);
+        return;
+      }
 
-        if (existing) {
-          existing.addEventListener(
-            "load",
-            () => {
-              if (
-                window[globalName]
-              ) {
-                resolve(
-                  window[
-                    globalName
-                  ]
-                );
-              } else {
-                reject(
-                  new Error(
-                    `${globalName} loaded but was not found.`
-                  )
-                );
-              }
-            },
-            {
-              once: true
-            }
-          );
+      const script = document.createElement("script");
 
-          existing.addEventListener(
-            "error",
-            () => {
-              reject(
-                new Error(
-                  `Could not load ${globalName}.`
-                )
-              );
-            },
-            {
-              once: true
-            }
-          );
+      script.src = src;
+      script.async = true;
 
-          return;
-        }
-
-        const script =
-          document.createElement(
-            "script"
-          );
-
-        script.src = src;
-        script.async = true;
-
-        script.onload = () => {
-          if (
-            window[globalName]
-          ) {
-            resolve(
-              window[globalName]
-            );
-          } else {
-            reject(
-              new Error(
-                `${globalName} loaded but was not found.`
-              )
-            );
-          }
-        };
-
-        script.onerror = () => {
+      script.onload = () => {
+        if (window[globalName]) {
+          resolve(window[globalName]);
+        } else {
           reject(
             new Error(
-              `Could not load ${globalName}.`
+              `${globalName} loaded but is unavailable.`
             )
           );
-        };
+        }
+      };
 
-        document.head.appendChild(
-          script
+      script.onerror = () => {
+        reject(
+          new Error(
+            `Could not load ${globalName}.`
+          )
         );
-      }
-    );
+      };
+
+      document.head.appendChild(script);
+    });
   }
 
 
@@ -449,21 +249,14 @@ here/* =========================================================
 
   async function loadLibraries() {
     showStatus(
-      "Loading conversion libraries...",
+      "Loading conversion libraries...\n\nPlease wait.",
       "info"
     );
 
-    const results =
-      await Promise.all([
-        loadScript(
-          JSZIP_URL,
-          "JSZip"
-        ),
-        loadScript(
-          PDFLIB_URL,
-          "PDFLib"
-        )
-      ]);
+    const results = await Promise.all([
+      loadScript(JSZIP_URL, "JSZip"),
+      loadScript(PDFLIB_URL, "PDFLib")
+    ]);
 
     return {
       JSZip: results[0],
@@ -473,28 +266,16 @@ here/* =========================================================
 
 
   /* =========================================================
-     GET BASE NAME
+     ZIP PATH
      ========================================================= */
 
-  function getBaseName(path) {
-    if (!path) {
-      return "";
-    }
-
-    const normalized =
-      path.replace(
-        /\\/g,
-        "/"
-      );
-
-    const parts =
-      normalized.split("/");
-
-    return (
-      parts[parts.length - 1]
-        .trim()
-        .toLowerCase()
-    );
+  function baseName(path) {
+    return path
+      .replace(/\\/g, "/")
+      .split("/")
+      .pop()
+      .trim()
+      .toLowerCase();
   }
 
 
@@ -502,47 +283,31 @@ here/* =========================================================
      FIND REQUIRED FILES
      ========================================================= */
 
-  function findRequiredFiles(zip) {
+  function findFiles(zip) {
     const found = {};
     const duplicates = [];
 
-    for (
-      const zipPath of Object.keys(
-        zip.files
-      )
-    ) {
-      const entry =
-        zip.files[zipPath];
+    for (const path of Object.keys(zip.files)) {
+
+      const entry = zip.files[path];
 
       if (entry.dir) {
         continue;
       }
 
-      const baseName =
-        getBaseName(zipPath);
+      const name = baseName(path);
 
-      if (
-        !REQUIRED_ORDER.includes(
-          baseName
-        )
-      ) {
+      if (!REQUIRED_ORDER.includes(name)) {
         continue;
       }
 
-      if (
-        found[baseName]
-      ) {
-        duplicates.push(
-          `${baseName}\n` +
-          `  - ${found[baseName].name}\n` +
-          `  - ${zipPath}`
-        );
-
+      if (found[name]) {
+        duplicates.push(name);
         continue;
       }
 
-      found[baseName] = {
-        name: zipPath,
+      found[name] = {
+        path,
         entry
       };
     }
@@ -558,742 +323,62 @@ here/* =========================================================
      VALIDATE ZIP
      ========================================================= */
 
-  function validateFiles(
-    found,
-    duplicates
-  ) {
-    if (
-      duplicates.length > 0
-    ) {
+  function validateZip(found, duplicates) {
+
+    if (duplicates.length > 0) {
       throw new Error(
-        "Duplicate required files were found:\n\n" +
-        duplicates.join(
-          "\n\n"
-        )
+        "Duplicate required files found:\n\n" +
+        duplicates.join("\n")
       );
     }
 
     const missing = [];
 
-    for (
-      const filename of
-      REQUIRED_ORDER
-    ) {
-      if (
-        !found[filename]
-      ) {
-        missing.push(
-          filename
-        );
+    for (const name of REQUIRED_ORDER) {
+      if (!found[name]) {
+        missing.push(name);
       }
     }
 
-    if (
-      missing.length > 0
-    ) {
+    if (missing.length > 0) {
       throw new Error(
-        "The ZIP is missing these required files:\n\n" +
-        missing
-          .map(
-            name =>
-              "• " + name
-          )
-          .join("\n")
+        "The ZIP is missing required files:\n\n" +
+        missing.map(x => "• " + x).join("\n")
       );
     }
   }
 
 
   /* =========================================================
-     CHECK IMAGE SIGNATURE
+     ADD PDF
      ========================================================= */
 
-  function hasJpegSignature(
-    bytes
-  ) {
-    return (
-      bytes &&
-      bytes.length >= 2 &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8
-    );
-  }
-
-
-  function hasPngSignature(
-    bytes
-  ) {
-    return (
-      bytes &&
-      bytes.length >= 8 &&
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47 &&
-      bytes[4] === 0x0d &&
-      bytes[5] === 0x0a &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0x0a
-    );
-  }
-
-
-  /* =========================================================
-     NORMALIZE JPEG
-
-     Some ZIPs contain a JPEG with extra bytes before FF D8.
-
-     pdf-lib expects the JPEG SOI marker at byte zero.
-
-     This function removes junk before SOI and after EOI.
-     ========================================================= */
-
-  function normalizeJpeg(
-    bytes
-  ) {
-    if (
-      hasJpegSignature(bytes)
-    ) {
-      return bytes;
-    }
-
-    let start = -1;
-
-    for (
-      let i = 0;
-      i < bytes.length - 1;
-      i++
-    ) {
-      if (
-        bytes[i] === 0xff &&
-        bytes[i + 1] === 0xd8
-      ) {
-        start = i;
-        break;
-      }
-    }
-
-    if (start < 0) {
-      return bytes;
-    }
-
-    let end =
-      bytes.length;
-
-    for (
-      let i = start + 2;
-      i < bytes.length - 1;
-      i++
-    ) {
-      if (
-        bytes[i] === 0xff &&
-        bytes[i + 1] === 0xd9
-      ) {
-        end = i + 2;
-        break;
-      }
-    }
-
-    return bytes.slice(
-      start,
-      end
-    );
-  }
-
-
-  /* =========================================================
-     BROWSER IMAGE DECODER
-
-     This is the important fallback for fees1cc.jpg.
-
-     If pdf-lib rejects the JPEG, the browser decodes it
-     and a canvas turns it into a clean PNG.
-
-     That PNG is then embedded into the PDF.
-     ========================================================= */
-
-  async function decodeImageToPng(
-    bytes,
-    mimeType
-  ) {
-    const blob =
-      new Blob(
-        [bytes],
-        {
-          type:
-            mimeType ||
-            "image/jpeg"
-        }
-      );
-
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-    try {
-      const image =
-        await new Promise(
-          (
-            resolve,
-            reject
-          ) => {
-            const img =
-              new Image();
-
-            img.onload = () => {
-              resolve(img);
-            };
-
-            img.onerror = () => {
-              reject(
-                new Error(
-                  "The browser could not decode this image."
-                )
-              );
-            };
-
-            img.src = url;
-          }
-        );
-
-      const width =
-        image.naturalWidth ||
-        image.width;
-
-      const height =
-        image.naturalHeight ||
-        image.height;
-
-      if (
-        !width ||
-        !height
-      ) {
-        throw new Error(
-          "Image dimensions could not be determined."
-        );
-      }
-
-      const canvas =
-        document.createElement(
-          "canvas"
-        );
-
-      canvas.width =
-        width;
-
-      canvas.height =
-        height;
-
-      const context =
-        canvas.getContext(
-          "2d"
-        );
-
-      if (!context) {
-        throw new Error(
-          "Could not create image canvas."
-        );
-      }
-
-      /*
-        White background prevents transparent PNGs from
-        becoming black/transparent unexpectedly.
-      */
-
-      context.fillStyle =
-        "#ffffff";
-
-      context.fillRect(
-        0,
-        0,
-        width,
-        height
-      );
-
-      context.drawImage(
-        image,
-        0,
-        0,
-        width,
-        height
-      );
-
-      const pngBlob =
-        await new Promise(
-          resolve =>
-            canvas.toBlob(
-              resolve,
-              "image/png"
-            )
-        );
-
-      if (!pngBlob) {
-        throw new Error(
-          "Could not create PNG from image."
-        );
-      }
-
-      return {
-        bytes:
-          new Uint8Array(
-            await pngBlob.arrayBuffer()
-          ),
-        width,
-        height
-      };
-    }
-
-    finally {
-      URL.revokeObjectURL(
-        url
-      );
-    }
-  }
-
-
-  /* =========================================================
-     GET IMAGE DIMENSIONS
-     ========================================================= */
-
-  function getImageDimensions(
-    bytes
-  ) {
-    /*
-      JPEG
-    */
-
-    const jpeg =
-      normalizeJpeg(bytes);
-
-    if (
-      hasJpegSignature(jpeg)
-    ) {
-      let offset = 2;
-
-      while (
-        offset <
-        jpeg.length
-      ) {
-        while (
-          offset <
-            jpeg.length &&
-          jpeg[offset] !==
-            0xff
-        ) {
-          offset++;
-        }
-
-        while (
-          offset <
-            jpeg.length &&
-          jpeg[offset] ===
-            0xff
-        ) {
-          offset++;
-        }
-
-        if (
-          offset >=
-          jpeg.length
-        ) {
-          break;
-        }
-
-        const marker =
-          jpeg[offset++];
-
-        if (
-          marker === 0xd8 ||
-          marker === 0xd9 ||
-          (
-            marker >= 0xd0 &&
-            marker <= 0xd7
-          )
-        ) {
-          continue;
-        }
-
-        if (
-          offset + 1 >=
-          jpeg.length
-        ) {
-          break;
-        }
-
-        const length =
-          (jpeg[offset] << 8) |
-          jpeg[offset + 1];
-
-        if (
-          length < 2
-        ) {
-          break;
-        }
-
-        const isSOF =
-          (
-            marker >= 0xc0 &&
-            marker <= 0xc3
-          ) ||
-          (
-            marker >= 0xc5 &&
-            marker <= 0xc7
-          ) ||
-          (
-            marker >= 0xc9 &&
-            marker <= 0xcb
-          ) ||
-          (
-            marker >= 0xcd &&
-            marker <= 0xcf
-          );
-
-        if (isSOF) {
-          if (
-            offset + 7 >=
-            jpeg.length
-          ) {
-            break;
-          }
-
-          const height =
-            (jpeg[offset + 3] << 8) |
-            jpeg[offset + 4];
-
-          const width =
-            (jpeg[offset + 5] << 8) |
-            jpeg[offset + 6];
-
-          return {
-            width,
-            height
-          };
-        }
-
-        offset +=
-          length;
-      }
-    }
-
-    /*
-      PNG
-    */
-
-    if (
-      hasPngSignature(bytes) &&
-      bytes.length >= 24
-    ) {
-      const view =
-        new DataView(
-          bytes.buffer,
-          bytes.byteOffset,
-          bytes.byteLength
-        );
-
-      return {
-        width:
-          view.getUint32(
-            16
-          ),
-        height:
-          view.getUint32(
-            20
-          )
-      };
-    }
-
-    return null;
-  }
-
-
-  /* =========================================================
-     A4 PAGE CONSTANTS
-     ========================================================= */
-
-  const A4_WIDTH =
-    595.2756;
-
-  const A4_HEIGHT =
-    841.8898;
-
-
-  /* =========================================================
-     ADD IMAGE PAGE
-     ========================================================= */
-
-  async function addImagePage(
-    pdfDoc,
-    bytes,
-    PDFLib,
-    filename
-  ) {
-    let image;
-    let imageWidth;
-    let imageHeight;
-
-    const lower =
-      filename.toLowerCase();
-
-    /*
-      ---------------------------------------------------------
-      PNG
-      ---------------------------------------------------------
-    */
-
-    if (
-      lower.endsWith(".png") ||
-      hasPngSignature(bytes)
-    ) {
-      try {
-        image =
-          await pdfDoc.embedPng(
-            bytes
-          );
-
-        const dimensions =
-          getImageDimensions(
-            bytes
-          );
-
-        if (
-          dimensions
-        ) {
-          imageWidth =
-            dimensions.width;
-
-          imageHeight =
-            dimensions.height;
-        }
-      }
-
-      catch (error) {
-        /*
-          Browser fallback
-        */
-
-        const converted =
-          await decodeImageToPng(
-            bytes,
-            "image/png"
-          );
-
-        image =
-          await pdfDoc.embedPng(
-            converted.bytes
-          );
-
-        imageWidth =
-          converted.width;
-
-        imageHeight =
-          converted.height;
-      }
-    }
-
-    /*
-      ---------------------------------------------------------
-      JPEG
-      ---------------------------------------------------------
-    */
-
-    else {
-      const normalized =
-        normalizeJpeg(
-          bytes
-        );
-
-      try {
-        image =
-          await pdfDoc.embedJpg(
-            normalized
-          );
-
-        const dimensions =
-          getImageDimensions(
-            normalized
-          );
-
-        if (
-          dimensions
-        ) {
-          imageWidth =
-            dimensions.width;
-
-          imageHeight =
-            dimensions.height;
-        }
-      }
-
-      catch (jpegError) {
-        console.warn(
-          "Direct JPEG embedding failed for:",
-          filename,
-          jpegError
-        );
-
-        /*
-          IMPORTANT FALLBACK
-
-          Let the browser decode the JPEG.
-        */
-
-        const converted =
-          await decodeImageToPng(
-            bytes,
-            "image/jpeg"
-          );
-
-        image =
-          await pdfDoc.embedPng(
-            converted.bytes
-          );
-
-        imageWidth =
-          converted.width;
-
-        imageHeight =
-          converted.height;
-      }
-    }
-
-    /*
-      If dimensions are unavailable, use the embedded
-      image dimensions supplied by pdf-lib.
-    */
-
-    if (
-      !imageWidth ||
-      !imageHeight
-    ) {
-      imageWidth =
-        image.width;
-
-      imageHeight =
-        image.height;
-    }
-
-    const page =
-      pdfDoc.addPage([
-        A4_WIDTH,
-        A4_HEIGHT
-      ]);
-
-    const imageRatio =
-      imageWidth /
-      imageHeight;
-
-    const pageRatio =
-      A4_WIDTH /
-      A4_HEIGHT;
-
-    let drawWidth;
-    let drawHeight;
-    let x;
-    let y;
-
-    /*
-      Fit inside A4 while preserving aspect ratio.
-    */
-
-    if (
-      imageRatio >
-      pageRatio
-    ) {
-      drawWidth =
-        A4_WIDTH;
-
-      drawHeight =
-        drawWidth /
-        imageRatio;
-
-      x = 0;
-
-      y =
-        (
-          A4_HEIGHT -
-          drawHeight
-        ) / 2;
-    }
-
-    else {
-      drawHeight =
-        A4_HEIGHT;
-
-      drawWidth =
-        drawHeight *
-        imageRatio;
-
-      x =
-        (
-          A4_WIDTH -
-          drawWidth
-        ) / 2;
-
-      y = 0;
-    }
-
-    page.drawImage(
-      image,
-      {
-        x,
-        y,
-        width:
-          drawWidth,
-        height:
-          drawHeight
-      }
-    );
-
-    return page;
-  }
-
-
-  /* =========================================================
-     APPEND PDF
-     ========================================================= */
-
-  async function appendPdf(
+  async function addPdf(
     outputPdf,
-    pdfBytes,
-    PDFLib,
-    filename
+    bytes,
+    PDFLib
   ) {
+
     const sourcePdf =
-      await PDFLib.PDFDocument.load(
-        pdfBytes,
-        {
-          ignoreEncryption: false,
-          updateMetadata: false
-        }
-      );
+      await PDFLib.PDFDocument.load(bytes, {
+        ignoreEncryption: false,
+        updateMetadata: false
+      });
 
     const pageCount =
       sourcePdf.getPageCount();
 
-    const indexes =
-      Array.from(
-        {
-          length:
-            pageCount
-        },
-        (_, index) =>
-          index
-      );
-
-    const copiedPages =
+    const pages =
       await outputPdf.copyPages(
         sourcePdf,
-        indexes
+        Array.from(
+          { length: pageCount },
+          (_, i) => i
+        )
       );
 
-    for (
-      const page of
-      copiedPages
-    ) {
-      outputPdf.addPage(
-        page
-      );
+    for (const page of pages) {
+      outputPdf.addPage(page);
     }
 
     return pageCount;
@@ -1301,147 +386,170 @@ here/* =========================================================
 
 
   /* =========================================================
-     CONVERT ZIP
+     ADD JPG
+     
+     IMPORTANT:
+     We do NOT manually search for the JPEG SOI marker.
+     pdf-lib itself validates the image.
      ========================================================= */
 
-  async function convertZipToPdf(
-    file
+  async function addJpg(
+    outputPdf,
+    bytes,
+    PDFLib
   ) {
+
+    const image =
+      await outputPdf.embedJpg(bytes);
+
+    const A4_WIDTH = 595.2756;
+    const A4_HEIGHT = 841.8898;
+
+    const page =
+      outputPdf.addPage([
+        A4_WIDTH,
+        A4_HEIGHT
+      ]);
+
+    /* Use dimensions supplied by pdf-lib. */
+
+    const imageWidth = image.width;
+    const imageHeight = image.height;
+
+    const imageRatio =
+      imageWidth / imageHeight;
+
+    const pageRatio =
+      A4_WIDTH / A4_HEIGHT;
+
+    let width;
+    let height;
+    let x;
+    let y;
+
+    if (imageRatio > pageRatio) {
+
+      width = A4_WIDTH;
+      height = width / imageRatio;
+
+      x = 0;
+      y = (A4_HEIGHT - height) / 2;
+
+    } else {
+
+      height = A4_HEIGHT;
+      width = height * imageRatio;
+
+      x = (A4_WIDTH - width) / 2;
+      y = 0;
+    }
+
+    page.drawImage(image, {
+      x,
+      y,
+      width,
+      height
+    });
+
+    return 1;
+  }
+
+
+  /* =========================================================
+     CONVERT
+     ========================================================= */
+
+  async function convertZip(file) {
+
     if (!file) {
       throw new Error(
-        "Please choose a ZIP file first."
+        "Please select a ZIP file first."
       );
     }
 
-    if (
-      !file.name
-        .toLowerCase()
-        .endsWith(".zip")
-    ) {
+    if (file.size > MAX_FILE_SIZE) {
       throw new Error(
-        "Please select a .zip file."
-      );
-    }
-
-    if (
-      file.size >
-      MAX_FILE_SIZE
-    ) {
-      throw new Error(
-        "The ZIP file is larger than 500 MB.\n\n" +
-        "Selected: " +
-        formatBytes(
-          file.size
-        ) +
-        "\n" +
-        "Maximum: 500 MB"
+        "The ZIP file is larger than 500 MB."
       );
     }
 
     const {
       JSZip,
       PDFLib
-    } =
-      await loadLibraries();
+    } = await loadLibraries();
 
     showStatus(
-      "Reading ZIP file...",
+      "Reading ZIP file...\n\nPlease wait.",
       "info"
     );
 
     const zip =
-      await JSZip.loadAsync(
-        file
-      );
+      await JSZip.loadAsync(file);
 
     const {
       found,
       duplicates
-    } =
-      findRequiredFiles(
-        zip
-      );
+    } = findFiles(zip);
 
-    validateFiles(
+    validateZip(
       found,
       duplicates
     );
-
-    showStatus(
-      "ZIP verified successfully.\n\n" +
-      "All required files were found.\n\n" +
-      "Starting conversion in the required order...",
-      "info"
-    );
-
-    /*
-      Create final PDF.
-    */
 
     const outputPdf =
       await PDFLib.PDFDocument.create();
 
     outputPdf.setTitle(
-      "Exploring Society: India and Beyond"
-    );
-
-    outputPdf.setSubject(
-      "Converted textbook PDF"
+      "fees1dd Converted PDF"
     );
 
     outputPdf.setCreator(
       "ZIP to PDF Converter"
     );
 
-    outputPdf.setProducer(
-      "ZIP to PDF Converter"
-    );
-
     let totalPages = 0;
 
-
-    /* =======================================================
-       PROCESS EXACT ORDER
-       ======================================================= */
+    /* =====================================================
+       PROCESS IN EXACT ORDER
+       ===================================================== */
 
     for (
       let i = 0;
-      i <
-      REQUIRED_ORDER.length;
+      i < REQUIRED_ORDER.length;
       i++
     ) {
+
       const filename =
         REQUIRED_ORDER[i];
 
       const item =
         found[filename];
 
-      const progress =
+      const percent =
         Math.round(
-          (
-            i /
-            REQUIRED_ORDER.length
-          ) *
-          100
+          ((i + 1) /
+            REQUIRED_ORDER.length) *
+            100
         );
 
       showStatus(
         `Converting ${i + 1} of ${REQUIRED_ORDER.length}\n\n` +
         `${filename}\n\n` +
-        `Progress: ${progress}%`,
+        `Progress: ${percent}%`,
         "info"
       );
 
       let bytes;
 
       try {
+
         bytes =
           await item.entry.async(
             "uint8array"
           );
-      }
 
-      catch (error) {
+      } catch (error) {
+
         throw new Error(
           `Could not read:\n${filename}\n\n` +
           `${error.message || error}`
@@ -1449,104 +557,77 @@ here/* =========================================================
       }
 
 
-      /* =====================================================
-         PDF
-         ===================================================== */
+      /* JPG */
+
+      if (
+        filename.endsWith(".jpg")
+      ) {
+
+        try {
+
+          const pages =
+            await addJpg(
+              outputPdf,
+              bytes,
+              PDFLib
+            );
+
+          totalPages += pages;
+
+        } catch (error) {
+
+          throw new Error(
+            `Could not process:\n${filename}\n\n` +
+            `${error.message || error}`
+          );
+        }
+
+        continue;
+      }
+
+
+      /* PDF */
 
       if (
         filename.endsWith(".pdf")
       ) {
+
         try {
-          const pagesAdded =
-            await appendPdf(
+
+          const pages =
+            await addPdf(
               outputPdf,
               bytes,
-              PDFLib,
-              filename
+              PDFLib
             );
 
-          totalPages +=
-            pagesAdded;
+          totalPages += pages;
 
-          showStatus(
-            `✓ Added ${filename}\n\n` +
-            `Pages in this file: ${pagesAdded}\n` +
-            `Total pages so far: ${totalPages}`,
-            "info"
-          );
-        }
+        } catch (error) {
 
-        catch (error) {
           throw new Error(
             `Could not process:\n${filename}\n\n` +
             `${error.message || error}`
           );
         }
+
+        continue;
       }
 
-
-      /* =====================================================
-         IMAGE
-         ===================================================== */
-
-      else if (
-        filename.endsWith(".jpg") ||
-        filename.endsWith(".jpeg") ||
-        filename.endsWith(".png")
-      ) {
-        try {
-          await addImagePage(
-            outputPdf,
-            bytes,
-            PDFLib,
-            filename
-          );
-
-          totalPages++;
-
-          showStatus(
-            `✓ Added image successfully\n\n` +
-            `${filename}\n\n` +
-            `Image became PDF page ${totalPages}.`,
-            "info"
-          );
-        }
-
-        catch (error) {
-          throw new Error(
-            `Could not process:\n${filename}\n\n` +
-            `${error.message || error}`
-          );
-        }
-      }
-
-
-      /* =====================================================
-         UNKNOWN
-         ===================================================== */
-
-      else {
-        throw new Error(
-          `Unsupported file type:\n${filename}`
-        );
-      }
-
-      /*
-        Release reference.
-      */
-
-      bytes = null;
+      throw new Error(
+        `Unsupported file:\n${filename}`
+      );
     }
 
 
-    /* =======================================================
-       FINAL SAVE
-       ======================================================= */
+    /* =====================================================
+       SAVE
+       ===================================================== */
 
     showStatus(
-      "All files have been processed.\n\n" +
-      `Total PDF pages created: ${totalPages}\n\n` +
-      "Building final PDF...",
+      "All files processed successfully.\n\n" +
+      `Total pages: ${totalPages}\n\n` +
+      "Creating final PDF...",
       "info"
     );
 
@@ -1557,10 +638,8 @@ here/* =========================================================
       });
 
     return {
-      bytes:
-        finalBytes,
-      pageCount:
-        totalPages
+      bytes: finalBytes,
+      pageCount: totalPages
     };
   }
 
@@ -1569,335 +648,177 @@ here/* =========================================================
      DOWNLOAD
      ========================================================= */
 
-  function downloadPdf(
-    bytes
-  ) {
+  function downloadPdf(bytes) {
+
     const blob =
       new Blob(
         [bytes],
         {
-          type:
-            "application/pdf"
+          type: "application/pdf"
         }
       );
 
     const url =
-      URL.createObjectURL(
-        blob
-      );
+      URL.createObjectURL(blob);
 
     const link =
-      document.createElement(
-        "a"
-      );
+      document.createElement("a");
 
-    link.href =
-      url;
+    link.href = url;
 
     link.download =
       "fees1dd-converted.pdf";
 
-    link.style.display =
-      "none";
-
-    document.body.appendChild(
-      link
-    );
+    document.body.appendChild(link);
 
     link.click();
 
     link.remove();
 
-    setTimeout(
-      () => {
-        URL.revokeObjectURL(
-          url
-        );
-      },
-      15000
-    );
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 10000);
   }
 
 
   /* =========================================================
-     FILE INFORMATION
+     CONVERT BUTTON
      ========================================================= */
 
-  function updateFileInfo(
-    file
-  ) {
-    const info =
-      findFileInfo();
+  async function handleConvert() {
 
-    if (!info) {
+    if (!zipInput) {
+      showStatus(
+        "ZIP input was not found.",
+        "error"
+      );
       return;
     }
+
+    const file =
+      zipInput.files &&
+      zipInput.files[0];
 
     if (!file) {
-      info.textContent =
-        "No ZIP file selected.";
-
+      showStatus(
+        "Please choose your ZIP file first.",
+        "warning"
+      );
       return;
     }
 
-    info.textContent =
-      `Selected: ${file.name}\n` +
-      `Size: ${formatBytes(file.size)}\n\n` +
-      `✅ Ready to convert.`;
+    if (
+      convertBtn.dataset.busy === "true"
+    ) {
+      return;
+    }
+
+    convertBtn.dataset.busy = "true";
+    convertBtn.disabled = true;
+
+    const oldText =
+      convertBtn.textContent;
+
+    convertBtn.textContent =
+      "Converting...";
+
+    try {
+
+      const result =
+        await convertZip(file);
+
+      showStatus(
+        `✅ CONVERSION COMPLETED\n\n` +
+        `Pages created: ${result.pageCount}\n\n` +
+        `File: fees1dd-converted.pdf\n\n` +
+        `The required files were processed in the specified order.`,
+        "success"
+      );
+
+      downloadPdf(result.bytes);
+
+    } catch (error) {
+
+      console.error(
+        "Conversion error:",
+        error
+      );
+
+      showStatus(
+        `❌ CONVERSION FAILED\n\n` +
+        `${error.message || error}`,
+        "error"
+      );
+
+    } finally {
+
+      convertBtn.dataset.busy =
+        "false";
+
+      convertBtn.disabled = false;
+
+      convertBtn.textContent =
+        oldText || "Convert ZIP to PDF";
+    }
   }
 
 
   /* =========================================================
-     FILE INPUT
+     INITIALIZE
      ========================================================= */
 
-  function setupFileInput(
-    fileInput,
-    convertButton
-  ) {
-    fileInput.addEventListener(
+  function initialize() {
+
+    getElements();
+
+    if (!zipInput) {
+
+      console.error(
+        "ERROR: #zipInput not found."
+      );
+
+      return;
+    }
+
+    if (!convertBtn) {
+
+      console.error(
+        "ERROR: #convertBtn not found."
+      );
+
+      return;
+    }
+
+    if (!fileInfo) {
+
+      console.error(
+        "ERROR: #fileInfo not found."
+      );
+
+      return;
+    }
+
+    /* Start disabled */
+
+    convertBtn.disabled = true;
+
+    /* IMPORTANT: Listen directly to #zipInput */
+
+    zipInput.addEventListener(
       "change",
-      () => {
-        const file =
-          fileInput.files &&
-          fileInput.files[0];
-
-        updateFileInfo(
-          file
-        );
-
-        if (!file) {
-          convertButton.disabled =
-            true;
-
-          return;
-        }
-
-        if (
-          !file.name
-            .toLowerCase()
-            .endsWith(".zip")
-        ) {
-          convertButton.disabled =
-            true;
-
-          showStatus(
-            "Please choose a .zip file.",
-            "warning"
-          );
-
-          return;
-        }
-
-        if (
-          file.size >
-          MAX_FILE_SIZE
-        ) {
-          convertButton.disabled =
-            true;
-
-          showStatus(
-            "This ZIP is larger than 500 MB.",
-            "warning"
-          );
-
-          return;
-        }
-
-        /*
-          THIS IS IMPORTANT:
-          Enable Convert as soon as a valid ZIP is selected.
-        */
-
-        convertButton.disabled =
-          false;
-
-        showStatus(
-          "✅ ZIP selected successfully.\n\n" +
-          `File: ${file.name}\n` +
-          `Size: ${formatBytes(file.size)}\n\n` +
-          "Tap “Convert ZIP to PDF”.",
-          "info"
-        );
-      }
-    );
-  }
-
-
-  /* =========================================================
-     CONVERTER SETUP
-     ========================================================= */
-
-  function setupConverter() {
-    const fileInput =
-      findFileInput();
-
-    const convertButton =
-      findConvertButton();
-
-    if (!fileInput) {
-      console.error(
-        "ZIP Converter: file input not found."
-      );
-
-      showStatus(
-        "❌ ZIP file input was not found.",
-        "error"
-      );
-
-      return;
-    }
-
-    if (!convertButton) {
-      console.error(
-        "ZIP Converter: convert button not found."
-      );
-
-      showStatus(
-        "❌ Convert button was not found.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    /*
-      Make sure the button exists visually.
-    */
-
-    convertButton.style.display =
-      "block";
-
-    convertButton.style.width =
-      "100%";
-
-    convertButton.style.minHeight =
-      "58px";
-
-
-    setupFileInput(
-      fileInput,
-      convertButton
+      handleFileSelection
     );
 
+    /* Convert */
 
-    /* =======================================================
-       CONVERT BUTTON
-       ======================================================= */
-
-    convertButton.addEventListener(
+    convertBtn.addEventListener(
       "click",
-      async event => {
-        event.preventDefault();
-
-        if (
-          convertButton.dataset.busy ===
-          "true"
-        ) {
-          return;
-        }
-
-        const file =
-          fileInput.files &&
-          fileInput.files[0];
-
-        if (!file) {
-          showStatus(
-            "Please choose your ZIP file first.",
-            "warning"
-          );
-
-          return;
-        }
-
-        convertButton.dataset.busy =
-          "true";
-
-        const originalText =
-          convertButton.textContent;
-
-        convertButton.disabled =
-          true;
-
-        convertButton.textContent =
-          "Converting...";
-
-
-        try {
-          lastOutputBytes =
-            null;
-
-          const result =
-            await convertZipToPdf(
-              file
-            );
-
-          lastOutputBytes =
-            result.bytes;
-
-          showStatus(
-            `✅ CONVERSION COMPLETED\n\n` +
-            `Total PDF pages: ${result.pageCount}\n\n` +
-            `Output: fees1dd-converted.pdf\n\n` +
-            `The files were merged in the required order.`,
-            "success"
-          );
-
-          downloadPdf(
-            result.bytes
-          );
-        }
-
-        catch (error) {
-          console.error(
-            "ZIP → PDF conversion error:",
-            error
-          );
-
-          showStatus(
-            `❌ CONVERSION FAILED\n\n` +
-            `${error.message || error}`,
-            "error"
-          );
-        }
-
-        finally {
-          convertButton.dataset.busy =
-            "false";
-
-          convertButton.disabled =
-            false;
-
-          convertButton.textContent =
-            originalText ||
-            "Convert ZIP to PDF";
-        }
-      }
+      handleConvert
     );
 
-
-    /*
-      Initial state.
-    */
-
-    const currentFile =
-      fileInput.files &&
-      fileInput.files[0];
-
-    if (currentFile) {
-      updateFileInfo(
-        currentFile
-      );
-
-      convertButton.disabled =
-        false;
-    }
-
-    else {
-      convertButton.disabled =
-        true;
-    }
+    console.log(
+      "✅ ZIP → PDF converter initialized."
+    );
   }
 
 
@@ -1906,20 +827,17 @@ here/* =========================================================
      ========================================================= */
 
   if (
-    document.readyState ===
-    "loading"
+    document.readyState === "loading"
   ) {
+
     document.addEventListener(
       "DOMContentLoaded",
-      setupConverter,
-      {
-        once: true
-      }
+      initialize
     );
-  }
 
-  else {
-    setupConverter();
+  } else {
+
+    initialize();
   }
 
 })();
