@@ -1,959 +1,698 @@
-// ZIP TO PDF CONVERTER - VERSION 2
-// Supports PDF, JPG, JPEG and PNG inside ZIP files
-// Processes files locally in the browser
+// ZIP to PDF Converter - Version 2
+// Processes everything locally in the browser.
+// Supports:
+// - PDF files
+// - JPG / JPEG files
+// - PNG files
+// - Large images are converted through Canvas to avoid JPEG parser errors
+// - Files are sorted naturally by filename
+// - Images are fitted onto A4 pages
 
-const JSZIP_URL =
-  "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+(() => {
+  "use strict";
 
-const PDFLIB_URL =
-  "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+  // ------------------------------------------------------------
+  // Find elements from index.html
+  // ------------------------------------------------------------
 
-let selectedZip = null;
+  const zipInput =
+    document.getElementById("zipInput") ||
+    document.getElementById("fileInput") ||
+    document.querySelector('input[type="file"]');
 
+  const convertBtn =
+    document.getElementById("convertBtn") ||
+    document.getElementById("convertButton") ||
+    document.querySelector("button");
 
-// ======================================================
-// LOAD LIBRARIES
-// ======================================================
+  const fileInfo =
+    document.getElementById("fileInfo") ||
+    document.getElementById("selectedFile");
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
+  const statusBox =
+    document.getElementById("status") ||
+    document.getElementById("statusBox") ||
+    document.getElementById("message");
 
-    script.src = src;
+  let selectedZip = null;
 
-    script.onload = resolve;
+  // ------------------------------------------------------------
+  // Safety check
+  // ------------------------------------------------------------
 
-    script.onerror = () =>
-      reject(new Error("Could not load required library."));
-
-    document.head.appendChild(script);
-  });
-}
-
-
-async function loadLibraries() {
-  if (!window.JSZip) {
-    await loadScript(JSZIP_URL);
+  if (!zipInput) {
+    console.error("ZIP input element was not found.");
+    return;
   }
 
-  if (!window.PDFLib) {
-    await loadScript(PDFLIB_URL);
+  // ------------------------------------------------------------
+  // Utility: show status
+  // ------------------------------------------------------------
+
+  function showStatus(message, type = "info") {
+    if (!statusBox) {
+      console.log(message);
+      return;
+    }
+
+    statusBox.textContent = message;
+
+    statusBox.className = "status " + type;
+
+    if (type === "error") {
+      statusBox.style.background = "#fff0f0";
+      statusBox.style.color = "#9b1c31";
+      statusBox.style.border = "1px solid #f3c2c9";
+    } else if (type === "success") {
+      statusBox.style.background = "#eafaf1";
+      statusBox.style.color = "#166534";
+      statusBox.style.border = "1px solid #b7e4c7";
+    } else {
+      statusBox.style.background = "#eef8ff";
+      statusBox.style.color = "#075985";
+      statusBox.style.border = "1px solid #bae6fd";
+    }
+
+    statusBox.style.padding = "18px";
+    statusBox.style.borderRadius = "18px";
+    statusBox.style.marginTop = "15px";
+    statusBox.style.fontWeight = "600";
   }
-}
 
+  // ------------------------------------------------------------
+  // Utility: format file size
+  // ------------------------------------------------------------
 
-// ======================================================
-// FIND ELEMENTS
-// ======================================================
+  function formatBytes(bytes) {
+    if (!bytes) return "0 B";
 
-const fileInput =
-  document.querySelector("#zipInput") ||
-  document.querySelector('input[type="file"]');
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
 
-const convertButton =
-  document.querySelector("#convertBtn") ||
-  [...document.querySelectorAll("button")].find((button) =>
-    button.textContent
-      .toLowerCase()
-      .includes("convert")
-  );
+    return (
+      (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2) +
+      " " +
+      units[i]
+    );
+  }
 
+  // ------------------------------------------------------------
+  // Natural sorting
+  // Example:
+  // page1.pdf
+  // page2.pdf
+  // page10.pdf
+  // ------------------------------------------------------------
 
-// ======================================================
-// FILE SELECTION
-// ======================================================
+  function naturalSort(a, b) {
+    return a.localeCompare(b, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
 
-if (fileInput) {
-  fileInput.addEventListener("change", function () {
+  // ------------------------------------------------------------
+  // File selection
+  // ------------------------------------------------------------
 
-    const file = this.files && this.files[0];
+  zipInput.addEventListener("change", function () {
+    if (!this.files || !this.files.length) {
+      selectedZip = null;
 
-    if (!file) return;
+      if (fileInfo) {
+        fileInfo.textContent = "";
+      }
+
+      return;
+    }
+
+    const file = this.files[0];
+
+    if (!file.name.toLowerCase().endsWith(".zip")) {
+      selectedZip = null;
+
+      showStatus("Please select a .zip file.", "error");
+
+      if (fileInfo) {
+        fileInfo.textContent = "";
+      }
+
+      return;
+    }
+
+    // 500 MB limit
+    const maxSize = 500 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      selectedZip = null;
+
+      showStatus(
+        "This ZIP is larger than the 500 MB limit.",
+        "error"
+      );
+
+      if (fileInfo) {
+        fileInfo.textContent = "";
+      }
+
+      return;
+    }
 
     selectedZip = file;
 
-    clearResult();
-
-    showSelectedFile(file);
-  });
-}
-
-
-// ======================================================
-// CONVERT BUTTON
-// ======================================================
-
-if (convertButton) {
-
-  convertButton.addEventListener("click", async function () {
-
-    if (!selectedZip) {
-      showMessage(
-        "Please select a ZIP file first.",
-        true
-      );
-
-      return;
+    if (fileInfo) {
+      fileInfo.textContent =
+        file.name + " — " + formatBytes(file.size);
     }
 
-    if (selectedZip.size > 500 * 1024 * 1024) {
+    showStatus(
+      "ZIP selected. Tap “Convert ZIP to PDF”.",
+      "success"
+    );
+  });
 
-      showMessage(
-        "File is larger than the 500 MB limit.",
-        true
-      );
+  // ------------------------------------------------------------
+  // Check file type
+  // ------------------------------------------------------------
 
-      return;
+  function getFileType(filename) {
+    const name = filename.toLowerCase();
+
+    if (name.endsWith(".pdf")) {
+      return "pdf";
     }
 
-    await convertZip(selectedZip);
+    if (
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg")
+    ) {
+      return "jpeg";
+    }
 
-  });
-}
+    if (name.endsWith(".png")) {
+      return "png";
+    }
 
+    return null;
+  }
 
-// ======================================================
-// MAIN ZIP CONVERSION
-// ======================================================
+  // ------------------------------------------------------------
+  // Convert image to PNG using browser Canvas
+  //
+  // This is the important fix for:
+  // "SOI not found in JPEG"
+  //
+  // We DO NOT directly pass the JPEG to pdf-lib.
+  // Instead:
+  //
+  // JPEG -> Browser Image Decoder -> Canvas -> PNG
+  //
+  // Then pdf-lib embeds the PNG.
+  // ------------------------------------------------------------
 
-async function convertZip(zipFile) {
+  async function imageToPngBytes(blob) {
+    let bitmap = null;
 
-  try {
+    try {
+      bitmap = await createImageBitmap(blob);
 
-    setLoading(true);
+      let width = bitmap.width;
+      let height = bitmap.height;
 
-    showMessage(
-      "Loading converter..."
-    );
-
-    await loadLibraries();
-
-    showMessage(
-      "Opening ZIP file..."
-    );
-
-    const zip =
-      await window.JSZip.loadAsync(zipFile);
-
-    const entries = [];
-
-    zip.forEach((path, entry) => {
-
-      if (!entry.dir) {
-
-        const lower =
-          path.toLowerCase();
-
-        if (
-          lower.endsWith(".pdf") ||
-          lower.endsWith(".jpg") ||
-          lower.endsWith(".jpeg") ||
-          lower.endsWith(".png")
-        ) {
-
-          entries.push({
-            path: path,
-            entry: entry
-          });
-
-        }
-
+      if (!width || !height) {
+        throw new Error("Image has invalid dimensions.");
       }
 
-    });
+      // A4 at approximately 150 DPI
+      const A4_WIDTH = 1240;
+      const A4_HEIGHT = 1754;
 
-
-    if (entries.length === 0) {
-
-      throw new Error(
-        "No PDF, JPG, JPEG or PNG files were found inside the ZIP."
+      // Fit image inside A4 while keeping aspect ratio
+      const scale = Math.min(
+        A4_WIDTH / width,
+        A4_HEIGHT / height,
+        1
       );
 
-    }
-
-
-    // Sort files naturally
-    entries.sort((a, b) =>
-      a.path.localeCompare(
-        b.path,
-        undefined,
-        {
-          numeric: true,
-          sensitivity: "base"
-        }
-      )
-    );
-
-
-    showMessage(
-      `Found ${entries.length} supported file(s).`
-    );
-
-
-    const finalPdf =
-      await window.PDFLib.PDFDocument.create();
-
-
-    let count = 0;
-
-
-    for (const item of entries) {
-
-      count++;
-
-
-      showMessage(
-        `Converting ${count} of ${entries.length}: ${item.path}`
+      const drawWidth = Math.max(
+        1,
+        Math.round(width * scale)
       );
 
+      const drawHeight = Math.max(
+        1,
+        Math.round(height * scale)
+      );
 
-      const data =
-        await item.entry.async("uint8array");
+      const canvas = document.createElement("canvas");
 
+      canvas.width = drawWidth;
+      canvas.height = drawHeight;
 
-      const lower =
-        item.path.toLowerCase();
+      const ctx = canvas.getContext("2d", {
+        alpha: false
+      });
 
-
-      if (lower.endsWith(".pdf")) {
-
-        await addPDF(
-          data,
-          finalPdf
-        );
-
-      } else {
-
-        await addImage(
-          data,
-          item.path,
-          finalPdf
-        );
-
+      if (!ctx) {
+        throw new Error("Canvas is not supported.");
       }
 
-
-      // Give the phone browser a little time
-      await new Promise(resolve =>
-        setTimeout(resolve, 10)
+      // White background
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(
+        0,
+        0,
+        drawWidth,
+        drawHeight
       );
 
+      ctx.drawImage(
+        bitmap,
+        0,
+        0,
+        drawWidth,
+        drawHeight
+      );
+
+      const pngBlob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          blobResult => {
+            if (blobResult) {
+              resolve(blobResult);
+            } else {
+              reject(
+                new Error(
+                  "Could not convert image to PNG."
+                )
+              );
+            }
+          },
+          "image/png"
+        );
+      });
+
+      const arrayBuffer =
+        await pngBlob.arrayBuffer();
+
+      return {
+        bytes: new Uint8Array(arrayBuffer),
+        width: drawWidth,
+        height: drawHeight
+      };
+    } finally {
+      if (bitmap) {
+        bitmap.close();
+      }
     }
+  }
 
+  // ------------------------------------------------------------
+  // Add image as A4 PDF page
+  // ------------------------------------------------------------
 
-    if (finalPdf.getPageCount() === 0) {
+  async function addImagePage(pdfDoc, blob) {
+    const imageData =
+      await imageToPngBytes(blob);
 
-      throw new Error(
-        "No pages were created."
+    const pngImage =
+      await pdfDoc.embedPng(
+        imageData.bytes
       );
 
-    }
+    // A4 dimensions in PDF points
+    const PAGE_WIDTH = 595.28;
+    const PAGE_HEIGHT = 841.89;
 
+    const page =
+      pdfDoc.addPage([
+        PAGE_WIDTH,
+        PAGE_HEIGHT
+      ]);
 
-    showMessage(
-      "Creating final PDF..."
+    const imgWidth =
+      imageData.width;
+
+    const imgHeight =
+      imageData.height;
+
+    const scale = Math.min(
+      (PAGE_WIDTH - 40) / imgWidth,
+      (PAGE_HEIGHT - 40) / imgHeight
     );
 
+    const drawWidth =
+      imgWidth * scale;
 
-    const pdfBytes =
-      await finalPdf.save();
+    const drawHeight =
+      imgHeight * scale;
 
+    const x =
+      (PAGE_WIDTH - drawWidth) / 2;
 
-    const blob =
-      new Blob(
-        [pdfBytes],
-        {
-          type: "application/pdf"
-        }
-      );
+    const y =
+      (PAGE_HEIGHT - drawHeight) / 2;
 
-
-    const url =
-      URL.createObjectURL(blob);
-
-
-    createDownloadButton(
-      url,
-      "converted.pdf"
-    );
-
-
-    showMessage(
-      `Conversion complete! ${finalPdf.getPageCount()} page(s) created.`
-    );
-
-
-  } catch (error) {
-
-    console.error(error);
-
-
-    showMessage(
-      "Conversion failed: " +
-      (error.message || "Unknown error"),
-      true
-    );
-
-
-  } finally {
-
-    setLoading(false);
-
-  }
-
-}
-
-
-// ======================================================
-// ADD PDF
-// ======================================================
-
-async function addPDF(
-  data,
-  finalPdf
-) {
-
-  try {
-
-    const sourcePdf =
-      await window.PDFLib.PDFDocument.load(
-        data
-      );
-
-
-    const pages =
-      await finalPdf.copyPages(
-        sourcePdf,
-        sourcePdf.getPageIndices()
-      );
-
-
-    pages.forEach(page => {
-
-      finalPdf.addPage(page);
-
-    });
-
-
-  } catch (error) {
-
-    throw new Error(
-      "A PDF inside the ZIP could not be opened. It may be corrupted or password-protected."
-    );
-
-  }
-
-}
-
-
-// ======================================================
-// ADD IMAGE
-// ======================================================
-
-async function addImage(
-  data,
-  fileName,
-  finalPdf
-) {
-
-  const blob =
-    new Blob([data]);
-
-
-  let imageElement;
-
-
-  try {
-
-    imageElement =
-      await loadImage(blob);
-
-  } catch (error) {
-
-    throw new Error(
-      `Could not read image: ${fileName}`
-    );
-
-  }
-
-
-  const width =
-    imageElement.naturalWidth;
-
-  const height =
-    imageElement.naturalHeight;
-
-
-  if (!width || !height) {
-
-    throw new Error(
-      `Invalid image: ${fileName}`
-    );
-
-  }
-
-
-  // A4 page in PDF points
-  const A4_WIDTH = 595.28;
-  const A4_HEIGHT = 841.89;
-
-  const margin = 20;
-
-  const availableWidth =
-    A4_WIDTH - margin * 2;
-
-  const availableHeight =
-    A4_HEIGHT - margin * 2;
-
-
-  const scale =
-    Math.min(
-      availableWidth / width,
-      availableHeight / height
-    );
-
-
-  const drawWidth =
-    width * scale;
-
-  const drawHeight =
-    height * scale;
-
-
-  const x =
-    (A4_WIDTH - drawWidth) / 2;
-
-  const y =
-    (A4_HEIGHT - drawHeight) / 2;
-
-
-  const page =
-    finalPdf.addPage([
-      A4_WIDTH,
-      A4_HEIGHT
-    ]);
-
-
-  // Create canvas
-  const canvas =
-    document.createElement("canvas");
-
-
-  canvas.width = width;
-  canvas.height = height;
-
-
-  const context =
-    canvas.getContext("2d");
-
-
-  if (!context) {
-
-    throw new Error(
-      `Could not process image: ${fileName}`
-    );
-
-  }
-
-
-  // White background
-  context.fillStyle =
-    "#ffffff";
-
-  context.fillRect(
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  // Draw image
-  context.drawImage(
-    imageElement,
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  // Convert to JPEG
-  const jpegBlob =
-    await canvasToJPEG(canvas);
-
-
-  const jpegBytes =
-    new Uint8Array(
-      await jpegBlob.arrayBuffer()
-    );
-
-
-  /*
-    IMPORTANT:
-
-    We convert the original image through
-    the browser canvas first.
-
-    This prevents the old:
-    "SOI not found in JPEG"
-    error.
-  */
-
-  const embeddedImage =
-    await finalPdf.embedJpg(
-      jpegBytes
-    );
-
-
-  page.drawImage(
-    embeddedImage,
-    {
-      x: x,
-      y: y,
+    page.drawImage(pngImage, {
+      x,
+      y,
       width: drawWidth,
       height: drawHeight
-    }
-  );
+    });
+  }
 
+  // ------------------------------------------------------------
+  // Add PDF pages
+  // ------------------------------------------------------------
 
-  // Release memory
-  canvas.width = 1;
-  canvas.height = 1;
-
-}
-
-
-// ======================================================
-// LOAD IMAGE SAFELY
-// ======================================================
-
-function loadImage(blob) {
-
-  return new Promise(
-    (resolve, reject) => {
-
-      const url =
-        URL.createObjectURL(blob);
-
-
-      const image =
-        new Image();
-
-
-      image.onload = () => {
-
-        URL.revokeObjectURL(url);
-
-        resolve(image);
-
-      };
-
-
-      image.onerror = () => {
-
-        URL.revokeObjectURL(url);
-
-        reject(
-          new Error(
-            "Image decoding failed."
-          )
+  async function addPdfPages(
+    outputPdf,
+    pdfBytes,
+    filename
+  ) {
+    try {
+      const sourcePdf =
+        await PDFLib.PDFDocument.load(
+          pdfBytes,
+          {
+            ignoreEncryption: false
+          }
         );
 
-      };
+      const pages =
+        await outputPdf.copyPages(
+          sourcePdf,
+          sourcePdf.getPageIndices()
+        );
 
+      for (const page of pages) {
+        outputPdf.addPage(page);
+      }
 
-      image.src = url;
+      return pages.length;
+    } catch (error) {
+      console.error(
+        "PDF error:",
+        filename,
+        error
+      );
 
+      throw new Error(
+        "Could not read PDF: " +
+          filename +
+          ". It may be password-protected or corrupted."
+      );
     }
-  );
+  }
 
-}
+  // ------------------------------------------------------------
+  // Main conversion
+  // ------------------------------------------------------------
 
+  async function convertZipToPdf() {
+    if (!selectedZip) {
+      showStatus(
+        "Please select a ZIP file first.",
+        "error"
+      );
 
-// ======================================================
-// CANVAS TO JPEG
-// ======================================================
+      return;
+    }
 
-function canvasToJPEG(canvas) {
+    // Make sure required libraries exist
+    if (typeof JSZip === "undefined") {
+      showStatus(
+        "JSZip library is missing. Check index.html.",
+        "error"
+      );
 
-  return new Promise(
-    (resolve, reject) => {
+      return;
+    }
 
-      canvas.toBlob(
-        function(blob) {
+    if (
+      typeof PDFLib === "undefined" ||
+      !PDFLib.PDFDocument
+    ) {
+      showStatus(
+        "PDF library is missing. Check index.html.",
+        "error"
+      );
 
-          if (!blob) {
+      return;
+    }
 
-            reject(
-              new Error(
-                "Could not convert image."
-              )
-            );
+    try {
+      if (convertBtn) {
+        convertBtn.disabled = true;
+        convertBtn.style.opacity = "0.6";
+        convertBtn.textContent =
+          "Converting...";
+      }
 
+      showStatus(
+        "Reading ZIP file...",
+        "info"
+      );
+
+      const zipBuffer =
+        await selectedZip.arrayBuffer();
+
+      const zip =
+        await JSZip.loadAsync(
+          zipBuffer,
+          {
+            checkCRC32: false
+          }
+        );
+
+      const entries = [];
+
+      // --------------------------------------------------------
+      // Collect supported files
+      // --------------------------------------------------------
+
+      Object.keys(zip.files).forEach(
+        filename => {
+          const entry = zip.files[filename];
+
+          if (entry.dir) {
             return;
           }
 
+          const type =
+            getFileType(filename);
 
-          resolve(blob);
+          if (!type) {
+            return;
+          }
 
-        },
-        "image/jpeg",
-        0.92
+          entries.push({
+            filename,
+            type,
+            entry
+          });
+        }
       );
 
+      // Sort files by filename
+      entries.sort((a, b) =>
+        naturalSort(
+          a.filename,
+          b.filename
+        )
+      );
+
+      if (!entries.length) {
+        throw new Error(
+          "No PDF, JPG, JPEG or PNG files were found inside this ZIP."
+        );
+      }
+
+      showStatus(
+        "Found " +
+          entries.length +
+          " supported file" +
+          (entries.length === 1
+            ? ""
+            : "s") +
+          ". Starting conversion...",
+        "info"
+      );
+
+      // --------------------------------------------------------
+      // Create output PDF
+      // --------------------------------------------------------
+
+      const outputPdf =
+        await PDFLib.PDFDocument.create();
+
+      // Better compatibility
+      outputPdf.setTitle(
+        "Converted ZIP to PDF"
+      );
+
+      outputPdf.setSubject(
+        "PDF created locally from ZIP files"
+      );
+
+      outputPdf.setCreator(
+        "ZIP to PDF Converter"
+      );
+
+      // --------------------------------------------------------
+      // Process every file
+      // --------------------------------------------------------
+
+      let processed = 0;
+
+      for (const item of entries) {
+        processed++;
+
+        showStatus(
+          "Converting " +
+            processed +
+            " of " +
+            entries.length +
+            ": " +
+            item.filename,
+          "info"
+        );
+
+        if (item.type === "pdf") {
+          const pdfBytes =
+            await item.entry.async(
+              "uint8array"
+            );
+
+          await addPdfPages(
+            outputPdf,
+            pdfBytes,
+            item.filename
+          );
+        }
+
+        else if (
+          item.type === "jpeg" ||
+          item.type === "png"
+        ) {
+          const blob =
+            await item.entry.async(
+              "blob"
+            );
+
+          await addImagePage(
+            outputPdf,
+            blob
+          );
+        }
+      }
+
+      // --------------------------------------------------------
+      // Save final PDF
+      // --------------------------------------------------------
+
+      showStatus(
+        "Creating final PDF...",
+        "info"
+      );
+
+      const finalBytes =
+        await outputPdf.save({
+          useObjectStreams: true
+        });
+
+      const finalBlob =
+        new Blob(
+          [finalBytes],
+          {
+            type: "application/pdf"
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          finalBlob
+        );
+
+      const downloadName =
+        selectedZip.name.replace(
+          /\.zip$/i,
+          ""
+        ) +
+        "-converted.pdf";
+
+      // --------------------------------------------------------
+      // Download
+      // --------------------------------------------------------
+
+      const link =
+        document.createElement("a");
+
+      link.href = url;
+      link.download = downloadName;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      // Keep URL alive briefly for Android
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 60000);
+
+      showStatus(
+        "Conversion complete! Your PDF has been downloaded.",
+        "success"
+      );
+
+      if (convertBtn) {
+        convertBtn.textContent =
+          "Convert ZIP to PDF";
+      }
+
+    } catch (error) {
+      console.error(
+        "ZIP to PDF conversion failed:",
+        error
+      );
+
+      let message =
+        error && error.message
+          ? error.message
+          : "Unknown conversion error.";
+
+      showStatus(
+        "Conversion failed: " +
+          message +
+          " Try a smaller ZIP or check that the PDFs/images are not corrupted.",
+        "error"
+      );
+
+      if (convertBtn) {
+        convertBtn.textContent =
+          "Convert ZIP to PDF";
+      }
+    } finally {
+      if (convertBtn) {
+        convertBtn.disabled = false;
+        convertBtn.style.opacity = "1";
+      }
     }
+  }
+
+  // ------------------------------------------------------------
+  // Convert button
+  // ------------------------------------------------------------
+
+  if (convertBtn) {
+    convertBtn.addEventListener(
+      "click",
+      convertZipToPdf
+    );
+  }
+
+  console.log(
+    "ZIP to PDF Converter Version 2 loaded successfully."
   );
-
-}
-
-
-// ======================================================
-// SELECTED FILE
-// ======================================================
-
-function showSelectedFile(file) {
-
-  let box =
-    document.querySelector(
-      "#selectedFile"
-    );
-
-
-  if (!box) {
-
-    box =
-      document.createElement("div");
-
-    box.id =
-      "selectedFile";
-
-    box.style.marginTop =
-      "15px";
-
-    box.style.padding =
-      "14px";
-
-    box.style.borderRadius =
-      "12px";
-
-    box.style.background =
-      "#f1f5f9";
-
-    box.style.fontWeight =
-      "600";
-
-
-    if (fileInput) {
-
-      fileInput.parentElement
-        .appendChild(box);
-
-    }
-
-  }
-
-
-  box.textContent =
-    `${file.name} — ${formatBytes(file.size)}`;
-
-}
-
-
-// ======================================================
-// DOWNLOAD BUTTON
-// ======================================================
-
-function createDownloadButton(
-  url,
-  fileName
-) {
-
-  const old =
-    document.querySelector(
-      "#downloadPdfButton"
-    );
-
-
-  if (old) {
-
-    old.remove();
-
-  }
-
-
-  const button =
-    document.createElement("a");
-
-
-  button.id =
-    "downloadPdfButton";
-
-
-  button.href =
-    url;
-
-
-  button.download =
-    fileName;
-
-
-  button.textContent =
-    "⬇ Download PDF";
-
-
-  button.style.display =
-    "block";
-
-
-  button.style.width =
-    "100%";
-
-
-  button.style.boxSizing =
-    "border-box";
-
-
-  button.style.marginTop =
-    "16px";
-
-
-  button.style.padding =
-    "16px";
-
-
-  button.style.borderRadius =
-    "12px";
-
-
-  button.style.background =
-    "#128276";
-
-
-  button.style.color =
-    "#ffffff";
-
-
-  button.style.textAlign =
-    "center";
-
-
-  button.style.textDecoration =
-    "none";
-
-
-  button.style.fontSize =
-    "18px";
-
-
-  button.style.fontWeight =
-    "700";
-
-
-  if (convertButton) {
-
-    convertButton.parentElement
-      .appendChild(button);
-
-  } else {
-
-    document.body.appendChild(button);
-
-  }
-
-}
-
-
-// ======================================================
-// MESSAGE
-// ======================================================
-
-function showMessage(
-  text,
-  error = false
-) {
-
-  let box =
-    document.querySelector(
-      "#conversionMessage"
-    );
-
-
-  if (!box) {
-
-    box =
-      document.createElement("div");
-
-    box.id =
-      "conversionMessage";
-
-
-    box.style.marginTop =
-      "15px";
-
-
-    box.style.padding =
-      "15px";
-
-
-    box.style.borderRadius =
-      "12px";
-
-
-    box.style.fontWeight =
-      "600";
-
-
-    if (convertButton) {
-
-      convertButton.parentElement
-        .appendChild(box);
-
-    } else {
-
-      document.body.appendChild(box);
-
-    }
-
-  }
-
-
-  box.textContent =
-    text;
-
-
-  if (error) {
-
-    box.style.background =
-      "#fee2e2";
-
-    box.style.color =
-      "#991b1b";
-
-  } else {
-
-    box.style.background =
-      "#dcfce7";
-
-    box.style.color =
-      "#166534";
-
-  }
-
-}
-
-
-// ======================================================
-// CLEAR RESULT
-// ======================================================
-
-function clearResult() {
-
-  const message =
-    document.querySelector(
-      "#conversionMessage"
-    );
-
-
-  if (message) {
-
-    message.remove();
-
-  }
-
-
-  const download =
-    document.querySelector(
-      "#downloadPdfButton"
-    );
-
-
-  if (download) {
-
-    download.remove();
-
-  }
-
-}
-
-
-// ======================================================
-// LOADING
-// ======================================================
-
-function setLoading(
-  loading
-) {
-
-  if (!convertButton) return;
-
-
-  if (loading) {
-
-    convertButton.disabled =
-      true;
-
-    convertButton.dataset.oldText =
-      convertButton.textContent;
-
-    convertButton.textContent =
-      "⏳ Converting...";
-
-    convertButton.style.opacity =
-      "0.7";
-
-
-  } else {
-
-    convertButton.disabled =
-      false;
-
-    convertButton.textContent =
-      convertButton.dataset.oldText ||
-      "Convert ZIP to PDF";
-
-    convertButton.style.opacity =
-      "1";
-
-  }
-
-}
-
-
-// ======================================================
-// FILE SIZE
-// ======================================================
-
-function formatBytes(bytes) {
-
-  if (bytes === 0)
-    return "0 Bytes";
-
-
-  const units = [
-    "Bytes",
-    "KB",
-    "MB",
-    "GB"
-  ];
-
-
-  const i =
-    Math.floor(
-      Math.log(bytes) /
-      Math.log(1024)
-    );
-
-
-  return (
-    parseFloat(
-      (
-        bytes /
-        Math.pow(1024, i)
-      ).toFixed(2)
-    ) +
-    " " +
-    units[i]
-  );
-
-}
+})();
