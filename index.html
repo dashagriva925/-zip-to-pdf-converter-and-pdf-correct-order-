@@ -1,17 +1,26 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f766e">
-  <meta name="description" content="Convert ZIP files containing PDFs and images into one PDF directly in your browser.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ZIP to PDF Converter</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- ZIP library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- PDF library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 </head>
+
 <body>
+
   <main class="container">
-    <header class="hero">
+
+    <header>
       <div class="logo">ZP</div>
+
       <div>
         <h1>ZIP to PDF Converter</h1>
         <p>Turn PDFs and JPG/PNG images inside a ZIP into one PDF.</p>
@@ -19,68 +28,84 @@
     </header>
 
     <section class="privacy">
-      <span>🔒</span>
-      <div><strong>Private by design</strong><br>
-      Your ZIP is processed in this browser. It is not uploaded to a server.</div>
+      🔒 <strong>Private by design</strong>
+      <br>
+      <span>Your ZIP is processed in this browser. It is not uploaded to a server.</span>
     </section>
 
-    <section class="card">
-      <label class="dropzone" id="dropzone" for="zipInput">
+    <section class="upload-card">
+
+      <label for="zipInput" class="drop-zone">
+
         <div class="upload-icon">↑</div>
+
         <h2>Select a ZIP file</h2>
+
         <p>Tap to choose a .zip file or drag one here</p>
-        <span class="limit">Maximum: 500 MB</span>
-        <input id="zipInput" type="file" accept=".zip,application/zip" hidden>
+
+        <strong>Maximum: 500 MB</strong>
+
+        <input
+          type="file"
+          id="zipInput"
+          accept=".zip,application/zip"
+          hidden
+        >
+
+        <div id="fileInfo" class="file-info"></div>
+
       </label>
 
-      <div id="fileInfo" class="file-info hidden"></div>
-
-      <button id="convertBtn" class="primary hidden" type="button">
+      <!-- CONVERT BUTTON -->
+      <button id="convertBtn" type="button" class="convert-btn" hidden>
         Convert ZIP to PDF
       </button>
 
-      <div id="progressArea" class="hidden">
-        <div class="progress-head">
-          <strong id="statusText">Preparing…</strong>
-          <span id="progressPercent">0%</span>
-        </div>
-        <div class="progress-track"><div id="progressBar"></div></div>
-        <p id="detailText" class="detail"></p>
-      </div>
+      <!-- STATUS -->
+      <div id="status" class="status"></div>
 
-      <div id="result" class="result hidden">
-        <div class="success">
-          <div class="success-icon">✓</div>
-          <div>
-            <h2>PDF is ready</h2>
-            <p id="summary"></p>
-          </div>
-        </div>
+      <!-- DOWNLOAD BUTTON -->
+      <a id="downloadBtn" class="download-btn" hidden>
+        Download PDF
+      </a>
 
-        <div class="result-actions">
-          <button id="downloadBtn" class="primary" type="button">↓ Download PDF</button>
-          <button id="openBtn" class="secondary" type="button">Open PDF</button>
-        </div>
-      </div>
-
-      <div id="errorBox" class="error hidden"></div>
-
-      <button id="resetBtn" class="secondary hidden" type="button">Convert another ZIP</button>
     </section>
 
     <section class="steps">
-      <article><b>1</b><div><strong>Upload</strong><p>Choose your ZIP file.</p></div></article>
-      <article><b>2</b><div><strong>Convert</strong><p>PDFs are merged and images become A4 pages.</p></div></article>
-      <article><b>3</b><div><strong>Download</strong><p>Save the finished PDF to your device.</p></div></article>
+
+      <div class="step">
+        <span>1</span>
+        <div>
+          <h3>Upload</h3>
+          <p>Choose your ZIP file.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <span>2</span>
+        <div>
+          <h3>Convert</h3>
+          <p>PDFs are merged and images become A4 pages.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <span>3</span>
+        <div>
+          <h3>Download</h3>
+          <p>Save the finished PDF to your device.</p>
+        </div>
+      </div>
+
     </section>
 
     <footer>
       Files stay on your device. Nothing is uploaded by this website.
     </footer>
+
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="app.js"></script>
+
 </body>
 </html>
