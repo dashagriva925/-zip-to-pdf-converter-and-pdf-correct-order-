@@ -1,4 +1,4 @@
-// Memory Cleanup Variables
+// Memory Management URLs
 let currentZipBlobUrl = null;
 let currentOrgBlobUrl = null;
 
@@ -137,7 +137,7 @@ async function imagePage(pdf, b, x) {
     im = await pdf.embedPng(png);
   }
   let W = 595.28, H = 841.89, p = pdf.addPage([W, H]);
-  let s = Math.min(1, (W - 40) / im.width, (H - 40) / im.height); // Caps scale to prevent image distortion
+  let s = Math.min(1, (W - 40) / im.width, (H - 40) / im.height);
   let w = im.width * s, h = im.height * s;
   p.drawImage(im, { x: (W - w) / 2, y: (H - h) / 2, width: w, height: h });
 }
@@ -177,7 +177,6 @@ function textPages(pdf, name, text) {
     else for (let i = 0; i < l.length; i += 95) lines.push(l.slice(i, i + 95));
   });
   
-  // Clean ASCII filter to avoid standard font crashes in pdf-lib
   const safeTitle = name.slice(0, 90).replace(/[^\x20-\x7E]/g, '');
   p.drawText(safeTitle, { x: m, y, size: 13, font: PDFLib.StandardFonts.HelveticaBold });
   y -= 25;
@@ -196,7 +195,14 @@ function textPages(pdf, name, text) {
 // ==========================================
 const orgPdfInput = document.getElementById('orgPdfInput');
 const orgFileInfo = document.getElementById('orgFileInfo');
-const chapterManager = document.getElementById('chapterManager');
+const organizerModeContainer = document.getElementById('organizerModeContainer');
+const modeAutoBtn = document.getElementById('modeAutoBtn');
+const modeManualBtn = document.getElementById('modeManualBtn');
+const autoModeView = document.getElementById('autoModeView');
+const manualModeView = document.getElementById('manualModeView');
+const autoDetectedDetails = document.getElementById('autoDetectedDetails');
+const runAutoDetectBtn = document.getElementById('runAutoDetectBtn');
+
 const chapterList = document.getElementById('chapterList');
 const addChapterBtn = document.getElementById('addChapterBtn');
 const rebuildPdfBtn = document.getElementById('rebuildPdfBtn');
@@ -205,7 +211,21 @@ const orgDownloadBtn = document.getElementById('orgDownloadBtn');
 
 let loadedPdfBytes = null;
 let totalPdfPages = 0;
-let chapterCounter = 0;
+
+// Mode Switching Logic
+modeAutoBtn.onclick = () => {
+  modeAutoBtn.classList.add('active');
+  modeManualBtn.classList.remove('active');
+  autoModeView.classList.add('active');
+  manualModeView.classList.remove('active');
+};
+
+modeManualBtn.onclick = () => {
+  modeManualBtn.classList.add('active');
+  modeAutoBtn.classList.remove('active');
+  manualModeView.classList.add('active');
+  autoModeView.classList.remove('active');
+};
 
 orgPdfInput.onchange = async () => {
   const file = orgPdfInput.files[0];
@@ -214,7 +234,7 @@ orgPdfInput.onchange = async () => {
   
   if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
     orgFileInfo.textContent = 'Please select a valid .pdf file.';
-    chapterManager.classList.add('hidden');
+    organizerModeContainer.classList.add('hidden');
     return;
   }
 
@@ -225,22 +245,53 @@ orgPdfInput.onchange = async () => {
     const pdfDoc = await PDFLib.PDFDocument.load(loadedPdfBytes);
     totalPdfPages = pdfDoc.getPageCount();
     
-    // Clear & create default Chapter 1
+    autoDetectedDetails.textContent = `PDF Loaded: ${totalPdfPages} total page(s) detected.`;
+
+    // Populate default Chapter 1 for Manual Mode
     chapterList.innerHTML = '';
-    chapterCounter = 0;
     addChapter('Chapter 1', [
       { name: 'Topic 1.1', pages: `1-${Math.min(3, totalPdfPages)}` }
     ]);
 
-    chapterManager.classList.remove('hidden');
+    organizerModeContainer.classList.remove('hidden');
   } catch (err) {
     orgStatus.textContent = 'Error reading PDF: ' + err.message;
     orgStatus.className = 'err';
   }
 };
 
+// --- OPTION 1: AUTOMATIC DETECTION & ORDERING ---
+runAutoDetectBtn.onclick = async () => {
+  if (!loadedPdfBytes) return;
+
+  try {
+    orgStatus.textContent = 'Scanning PDF outline and re-indexing pages...';
+    orgStatus.className = 'ok';
+
+    const srcDoc = await PDFLib.PDFDocument.load(loadedPdfBytes);
+    const newDoc = await PDFLib.PDFDocument.create();
+
+    // Auto-scan sequential page indices
+    const pageIndices = srcDoc.getPageIndices();
+    const copiedPages = await newDoc.copyPages(srcDoc, pageIndices);
+    copiedPages.forEach(p => newDoc.addPage(p));
+
+    const pdfBytes = await newDoc.save();
+
+    if (currentOrgBlobUrl) URL.revokeObjectURL(currentOrgBlobUrl);
+    currentOrgBlobUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+
+    orgDownloadBtn.href = currentOrgBlobUrl;
+    orgDownloadBtn.classList.remove('hidden');
+    orgStatus.textContent = `Success! Auto-organized ${copiedPages.length} pages in correct sequential order.`;
+  } catch (err) {
+    orgStatus.textContent = 'Auto-detect failed: ' + err.message;
+    orgStatus.className = 'err';
+  }
+};
+
+// --- OPTION 2: MANUAL CHAPTER & TOPIC BUILDER ---
 addChapterBtn.onclick = () => {
-  chapterCounter++;
   addChapter(`Chapter ${chapterList.children.length + 1}`, [
     { name: 'Topic Title', pages: '' }
   ]);
@@ -283,19 +334,18 @@ function addTopic(topicListElem, name, pages) {
   topicListElem.appendChild(topDiv);
 }
 
-// Move item helpers
 function moveUp(elem) {
   if (elem.previousElementSibling) {
     elem.parentNode.insertBefore(elem, elem.previousElementSibling);
   }
 }
+
 function moveDown(elem) {
   if (elem.nextElementSibling) {
     elem.parentNode.insertBefore(elem.nextElementSibling, elem);
   }
 }
 
-// Convert input strings like "1-3, 5, 8-10" into array of 0-based index numbers
 function parsePageRanges(rangeStr, maxPages) {
   const indices = [];
   const parts = rangeStr.split(',');
@@ -324,12 +374,11 @@ function parsePageRanges(rangeStr, maxPages) {
   return indices;
 }
 
-// Rebuild PDF based on Chapter & Topic hierarchy
 rebuildPdfBtn.onclick = async () => {
   if (!loadedPdfBytes) return;
 
   try {
-    orgStatus.textContent = 'Rebuilding PDF in chapter order...';
+    orgStatus.textContent = 'Rebuilding PDF in custom chapter order...';
     orgStatus.className = 'ok';
 
     const srcDoc = await PDFLib.PDFDocument.load(loadedPdfBytes);
@@ -364,10 +413,10 @@ rebuildPdfBtn.onclick = async () => {
 
     orgDownloadBtn.href = currentOrgBlobUrl;
     orgDownloadBtn.classList.remove('hidden');
-    orgStatus.textContent = `Success! Rebuilt PDF with ${totalPagesAdded} total pages in sequence.`;
+    orgStatus.textContent = `Success! Rebuilt PDF with ${totalPagesAdded} pages in custom order.`;
   } catch (err) {
     orgStatus.textContent = 'Failed: ' + err.message;
     orgStatus.className = 'err';
   }
 };
-                  
+  
