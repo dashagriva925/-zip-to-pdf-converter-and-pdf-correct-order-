@@ -24,7 +24,7 @@
     <span>All processing happens directly in your browser. Files are never uploaded to any server.</span>
   </section>
 
-  <!-- Navigation Tabs -->
+  <!-- Main Navigation Tabs -->
   <nav class="tabs">
     <button id="tabZipBtn" class="tab-btn active">ZIP to PDF</button>
     <button id="tabPdfBtn" class="tab-btn">Chapter & Topic Organizer</button>
@@ -65,28 +65,47 @@
     <div class="card">
       <label class="drop" for="orgPdfInput">
         <div class="up">📚</div>
-        <h2>Select PDF to Organize by Chapters</h2>
-        <p>Tap here to choose a <b>.pdf</b> file with out-of-order pages.</p>
+        <h2>Select PDF to Organize</h2>
+        <p>Tap here to choose a <b>.pdf</b> file with out-of-order pages or chapters.</p>
       </label>
       <input id="orgPdfInput" type="file" accept="application/pdf">
 
       <div id="orgFileInfo" class="file">No PDF selected.</div>
 
-      <!-- Chapter & Topic Manager Container -->
-      <div id="chapterManager" class="hidden">
-        <div class="chapter-bar-head">
-          <h3>Structure Chapters & Topics</h3>
-          <button id="addChapterBtn" class="btn-secondary">+ Add Chapter</button>
+      <!-- Mode Selector (Auto vs Manual) -->
+      <div id="organizerModeContainer" class="hidden">
+        <h3>Choose Organization Method:</h3>
+        <div class="mode-toggle">
+          <button id="modeAutoBtn" class="mode-btn active">🪄 Auto-Detect & Order</button>
+          <button id="modeManualBtn" class="mode-btn">✏️ Manual Chapter Builder</button>
         </div>
-        <p class="small">Enter page numbers or ranges (e.g., <code>1-3, 5</code>) for each topic. Reorder chapters and topics using ↑ / ↓.</p>
-        
-        <div id="chapterList"></div>
 
-        <button id="rebuildPdfBtn" class="download-btn">Recreate Ordered PDF</button>
+        <!-- OPTION 1: AUTOMATIC DETECTION -->
+        <div id="autoModeView" class="mode-view active">
+          <div class="info-box">
+            <h4>🪄 Automatic Chapter & Page Order Detection</h4>
+            <p>Automatically scans document outlines, bookmarks, and page tree indices to restructure pages into seamless, sequential chapter order.</p>
+            <div id="autoDetectedDetails" class="small-badge">Ready to scan PDF...</div>
+          </div>
+          <button id="runAutoDetectBtn" class="download-btn">Auto-Organize PDF</button>
+        </div>
+
+        <!-- OPTION 2: MANUAL CHAPTER BUILDER -->
+        <div id="manualModeView" class="mode-view">
+          <div class="chapter-bar-head">
+            <h4>Structure Chapters & Topics Manually</h4>
+            <button id="addChapterBtn" class="btn-secondary">+ Add Chapter</button>
+          </div>
+          <p class="small">Enter page ranges (e.g., <code>1-3, 5</code>) for each topic. Move chapters anywhere using ↑ / ↓ buttons.</p>
+          
+          <div id="chapterList"></div>
+
+          <button id="rebuildPdfBtn" class="download-btn">Recreate Ordered PDF</button>
+        </div>
       </div>
 
       <div id="orgStatus"></div>
-      <a id="orgDownloadBtn" class="download hidden" download="organized-chapters.pdf">Download Ordered PDF</a>
+      <a id="orgDownloadBtn" class="download hidden" download="organized-chapters.pdf">Download Organized PDF</a>
     </div>
   </section>
 
