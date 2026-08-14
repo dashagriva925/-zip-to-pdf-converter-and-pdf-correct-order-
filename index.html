@@ -1,24 +1,100 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ZIP to PDF Converter</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-</head><body>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZIP & PDF Chapter Organizer</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- External Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
 <main class="wrap">
-<header><div class="logo">ZP</div><div><h1>ZIP to PDF Converter</h1><p>Convert files inside a ZIP into one PDF.</p></div></header>
-<section class="privacy">🔒 <b>Private by design</b><br><span>Your ZIP is processed in this browser. It is not uploaded to a server.</span></section>
-<section class="card">
-<label class="drop" for="zipInput"><div class="up">↑</div><h2>Select a ZIP file</h2><p>Tap here to choose any <b>.zip</b> file.</p><strong>Maximum: 500 MB</strong></label>
-<input id="zipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed">
-<div id="fileInfo" class="file">No ZIP selected.</div>
-<button id="convertBtn" disabled>Convert ZIP to PDF</button>
-<div id="progressBox" class="hidden"><div class="bar"><i id="progress"></i></div><small id="progressText">Preparing...</small></div>
-<div id="status"></div>
-<a id="downloadBtn" class="download hidden" download="converted-files.pdf">Download PDF</a>
-</section>
-<section class="card"><h3>Supported files inside ZIP</h3><p>PDF, JPG/JPEG, PNG, GIF, BMP, WEBP, SVG, TXT, CSV, HTML, HTM, XML, JSON, MD and LOG.</p><p class="small">Any normal .zip file can be selected. Unsupported files are skipped and reported. Password-protected ZIPs are not supported.</p></section>
-<div class="steps"><div><b>1</b><span>Upload<br><small>Choose any ZIP.</small></span></div><div><b>2</b><span>Convert<br><small>Supported files become one PDF.</small></span></div><div><b>3</b><span>Download<br><small>Save the finished PDF.</small></span></div></div>
-<footer>Files stay on your device. Nothing is uploaded by this website.</footer>
-</main><script src="app.js"></script></body></html>
+  <header>
+    <div class="logo">ZP</div>
+    <div>
+      <h1>ZIP & PDF Studio</h1>
+      <p>Convert archives or organize PDF chapters and topics locally in your browser.</p>
+    </div>
+  </header>
+
+  <section class="privacy">
+    🔒 <b>Private by design</b><br>
+    <span>All processing happens directly in your browser. Files are never uploaded to any server.</span>
+  </section>
+
+  <!-- Navigation Tabs -->
+  <nav class="tabs">
+    <button id="tabZipBtn" class="tab-btn active">ZIP to PDF</button>
+    <button id="tabPdfBtn" class="tab-btn">Chapter & Topic Organizer</button>
+  </nav>
+
+  <!-- TAB 1: ZIP TO PDF CONVERTER -->
+  <section id="zipTab" class="tab-content active">
+    <div class="card">
+      <label class="drop" for="zipInput">
+        <div class="up">↑</div>
+        <h2>Select a ZIP file</h2>
+        <p>Tap here to choose any <b>.zip</b> file.</p>
+        <strong>Maximum: 500 MB</strong>
+      </label>
+      <input id="zipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed">
+      
+      <div id="fileInfo" class="file">No ZIP selected.</div>
+      <button id="convertBtn" disabled>Convert ZIP to PDF</button>
+
+      <div id="progressBox" class="hidden">
+        <div class="bar"><i id="progress"></i></div>
+        <small id="progressText">Preparing...</small>
+      </div>
+
+      <div id="status"></div>
+      <a id="downloadBtn" class="download hidden" download="converted-files.pdf">Download PDF</a>
+    </div>
+
+    <section class="card">
+      <h3>Supported files inside ZIP</h3>
+      <p>PDF, JPG/JPEG, PNG, GIF, BMP, WEBP, SVG, TXT, CSV, HTML, HTM, XML, JSON, MD and LOG.</p>
+      <p class="small">Unsupported files are skipped automatically. Password-protected ZIPs are not supported.</p>
+    </section>
+  </section>
+
+  <!-- TAB 2: CHAPTER & TOPIC ORGANIZER -->
+  <section id="pdfTab" class="tab-content">
+    <div class="card">
+      <label class="drop" for="orgPdfInput">
+        <div class="up">📚</div>
+        <h2>Select PDF to Organize by Chapters</h2>
+        <p>Tap here to choose a <b>.pdf</b> file with out-of-order pages.</p>
+      </label>
+      <input id="orgPdfInput" type="file" accept="application/pdf">
+
+      <div id="orgFileInfo" class="file">No PDF selected.</div>
+
+      <!-- Chapter & Topic Manager Container -->
+      <div id="chapterManager" class="hidden">
+        <div class="chapter-bar-head">
+          <h3>Structure Chapters & Topics</h3>
+          <button id="addChapterBtn" class="btn-secondary">+ Add Chapter</button>
+        </div>
+        <p class="small">Enter page numbers or ranges (e.g., <code>1-3, 5</code>) for each topic. Reorder chapters and topics using ↑ / ↓.</p>
+        
+        <div id="chapterList"></div>
+
+        <button id="rebuildPdfBtn" class="download-btn">Recreate Ordered PDF</button>
+      </div>
+
+      <div id="orgStatus"></div>
+      <a id="orgDownloadBtn" class="download hidden" download="organized-chapters.pdf">Download Ordered PDF</a>
+    </div>
+  </section>
+
+  <footer>
+    Files stay on your device. Nothing is uploaded by this website.
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
