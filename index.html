@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZIP to PDF Converter • PDF Topic Organizer</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head><body>
+<div class="wrap">
+<header><div class="logo">ZP</div><div><h1>ZIP to PDF Converter</h1><p>Convert ZIP files and organize PDFs topic-wise.</p></div></header>
+<div class="privacy">🔒 <b>Private by design</b><br><span>Your files are processed locally in your browser. They are not uploaded.</span></div>
+<nav class="tabs"><button class="tab active" data-page="zipPage">ZIP → PDF</button><button class="tab" data-page="organizerPage">PDF Topic Organizer</button></nav>
+
+<section id="zipPage" class="page active"><div class="card">
+<label class="drop" for="zipInput"><div class="up">↑</div><h2>Select a ZIP file</h2><p>Choose any normal <b>.zip</b> file.</p><strong>Maximum: 500 MB</strong></label>
+<input id="zipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed">
+<div id="zipInfo" class="file">No ZIP selected.</div><button id="zipConvert" disabled>Convert ZIP to PDF</button><div id="zipStatus"></div>
+<a id="zipDownload" class="download hidden" download="converted-files.pdf">Download PDF</a>
+</div></section>
+
+<section id="organizerPage" class="page"><div class="card">
+<label class="drop" for="pdfInput"><div class="up">📄</div><h2>Select a PDF</h2><p>Upload the PDF you want to organize.</p></label>
+<input id="pdfInput" type="file" accept="application/pdf,.pdf"><div id="pdfInfo" class="file">No PDF selected.</div>
+<div class="mode-title">Choose organization mode</div><div class="modes"><button class="mode active" data-mode="auto">🤖 Automatic</button><button class="mode" data-mode="manual">✋ Manual</button></div>
+<button id="analyzeBtn" disabled>Analyze PDF</button><div id="organizerStatus"></div>
+<div id="autoPanel" class="panel hidden"><h3>Automatic order</h3><p class="small">Detects chapter/topic numbers and proposes an order. Review it before creating the PDF.</p><div id="autoList" class="list"></div><button id="recreateAuto" class="secondary" disabled>Recreate PDF in This Order</button></div>
+<div id="manualPanel" class="panel hidden"><h3>Manual order</h3><p class="small">Use ↑ and ↓ to rearrange pages. Dragging is also supported on devices that allow it.</p><div id="manualList" class="list"></div><button id="recreateManual" class="secondary" disabled>Recreate PDF in This Order</button></div>
+<a id="organizerDownload" class="download hidden" download="organized.pdf">Download Organized PDF</a>
+</div></section>
+<div class="how card"><h3>How it works</h3><p><b>1.</b> ZIP → PDF converts supported files inside a ZIP.</p><p><b>2.</b> PDF Topic Organizer offers Automatic or Manual order.</p><p><b>3.</b> Everything happens locally on your device.</p></div>
+<footer>ZIP to PDF Converter • PDF Topic Organizer</footer>
+</div><script src="app.js"></script></body></html>
