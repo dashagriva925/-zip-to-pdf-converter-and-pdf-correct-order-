@@ -11,7 +11,7 @@ header p { margin: 0; color: #66727f; font-size: 16px; }
 .privacy { background: #eafbf1; border-color: #b9e5c9; color: #235c3b; line-height: 1.5; }
 .privacy span { font-size: 15px; }
 
-/* Tabs UI */
+/* Main Nav Tabs UI */
 .tabs { display: flex; gap: 10px; margin-bottom: 16px; }
 .tab-btn { flex: 1; padding: 14px; background: #e3eaec; color: #152033; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 15px; }
 .tab-btn.active { background: #138477; color: white; }
@@ -26,6 +26,18 @@ header p { margin: 0; color: #66727f; font-size: 16px; }
 
 #zipInput, #orgPdfInput { display: none; }
 .file { background: #f1f5f8; border-radius: 14px; padding: 14px; font-weight: 700; overflow-wrap: anywhere; margin: 13px 0; }
+
+/* Mode Toggles (Auto vs Manual) */
+.mode-toggle { display: flex; gap: 8px; margin: 12px 0 16px; }
+.mode-btn { flex: 1; padding: 11px; background: #f0f4f6; border: 1px solid #cfdcde; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; color: #334155; }
+.mode-btn.active { background: #167fda; color: white; border-color: #167fda; }
+.mode-view { display: none; }
+.mode-view.active { display: block; }
+
+.info-box { background: #f0f8ff; border: 1px solid #b8daff; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+.info-box h4 { margin: 0 0 8px; color: #004085; }
+.info-box p { margin: 0 0 10px; font-size: 14px; color: #1b4b72; }
+.small-badge { font-size: 13px; font-weight: bold; background: #d1ecf1; color: #0c5460; padding: 6px 12px; border-radius: 6px; display: inline-block; }
 
 /* Buttons */
 button, .download, .download-btn { display: block; width: 100%; padding: 16px; border: 0; border-radius: 15px; text-align: center; font-size: 17px; font-weight: 800; text-decoration: none; cursor: pointer; }
